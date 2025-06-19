@@ -27,16 +27,18 @@ import CreateLessonForm from '../components/courses/CreateLessonForm';
 
 const CourseLessonsPage = () => {
   const { courseId } = useParams();
-  const navigate = useNavigate();
-  const { currentUser } = useAuth();
-  const [showCreateForm, setShowCreateForm] = useState(false); // Déplacé à l'intérieur du composant
+  const navigate = useNavigate(); 
+  const { currentUser } = useAuth(); // ✅ doit être ici, pas dehors
+
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [state, setState] = useState({
     loading: true,
     course: null,
     lessons: [],
     userProgress: {}
   });
-  useEffect(() => {
+
+  const isInstructor = currentUser?.uid === state.course?.createdBy;  useEffect(() => {
     const fetchData = async () => {
       try {
         setState(prev => ({ ...prev, loading: true }));
@@ -114,6 +116,24 @@ const CourseLessonsPage = () => {
       console.error("Error updating progress:", error);
     }
   };
+  const handlePublish = async (lessonId) => {
+  try {
+    await setDoc(
+      doc(db, 'lessons', lessonId),
+      { isPublished: true },
+      { merge: true }
+    );
+
+    setState((prev) => ({
+      ...prev,
+      lessons: prev.lessons.map((l) =>
+        l.id === lessonId ? { ...l, isPublished: true } : l
+      ),
+    }));
+  } catch (err) {
+    console.error('Erreur lors de la publication de la leçon :', err);
+  }
+};
 
   if (state.loading) {
     return (
@@ -221,10 +241,12 @@ const CourseLessonsPage = () => {
             {state.lessons.map((lesson, index) => (
               <LessonItem
                 key={lesson.id}
-                lesson={lesson}
-                index={index}
-                isCompleted={state.userProgress[lesson.id]?.completed || false}
-                onMarkCompleted={handleMarkCompleted}
+  lesson={lesson}
+  index={index}
+  isCompleted={state.userProgress[lesson.id]?.completed || false}
+  onMarkCompleted={handleMarkCompleted}
+  canPublish={currentUser?.uid === state.course.instructorId}
+  onPublish={handlePublish}
               />
             ))}
           </Box>

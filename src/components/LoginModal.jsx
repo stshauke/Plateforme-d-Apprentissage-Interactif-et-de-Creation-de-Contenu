@@ -1,7 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../utils/firebase';
+import { auth, db } from '../utils/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+
 import ReCAPTCHA from 'react-google-recaptcha';
 
 import {
@@ -54,7 +56,23 @@ const LoginModal = ({ open, onClose, onSwitchToRegister }) => {
     setIsLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      console.log('Connecté :', userCredential.user);
+      const user = userCredential.user;
+
+      // 🔍 Récupérer les infos utilisateur depuis Firestore
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        console.log('Connecté :', user.email);
+        console.log('Rôle :', userData.role);
+
+        // Facultatif : stocker le rôle localement
+        localStorage.setItem('userRole', userData.role);
+      } else {
+        console.warn("Données utilisateur non trouvées dans Firestore.");
+      }
+
       setSubmitSuccess(true);
       setTimeout(() => {
         onClose();
@@ -189,45 +207,40 @@ const LoginModal = ({ open, onClose, onSwitchToRegister }) => {
           )}
         </Box>
 
-        
-
         <Box sx={{ mt: 3, textAlign: 'center' }}>
-  {/* Lien mot de passe oublié */}
-  <Typography variant="body2" sx={{ mb: 1 }}>
-    <Link href="#" onClick={(e) => e.preventDefault()}>
-      Mot de passe oublié ?
-    </Link>
-  </Typography>
-  
-  {/* Lien conditions générales */}
-  <Typography variant="body2" sx={{ mb: 2 }}>
-    <Link href="#" onClick={(e) => e.preventDefault()}>
-      Conditions générales
-    </Link>
-  </Typography>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            <Link href="#" onClick={(e) => e.preventDefault()}>
+              Mot de passe oublié ?
+            </Link>
+          </Typography>
 
-  {/* Lien d'inscription */}
-  <Typography variant="body2">
-    Pas encore de compte ?{' '}
-    <Link
-      component="button"
-      variant="body2"
-      onClick={(e) => {
-        e.preventDefault();
-        onSwitchToRegister();
-      }}
-      sx={{ 
-        cursor: 'pointer',
-        fontWeight: 'bold',
-        '&:hover': {
-          textDecoration: 'underline'
-        }
-      }}
-    >
-      Créer un compte
-    </Link>
-  </Typography>
-</Box>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            <Link href="#" onClick={(e) => e.preventDefault()}>
+              Conditions générales
+            </Link>
+          </Typography>
+
+          <Typography variant="body2">
+            Pas encore de compte ?{' '}
+            <Link
+              component="button"
+              variant="body2"
+              onClick={(e) => {
+                e.preventDefault();
+                onSwitchToRegister();
+              }}
+              sx={{
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                '&:hover': {
+                  textDecoration: 'underline'
+                }
+              }}
+            >
+              Créer un compte
+            </Link>
+          </Typography>
+        </Box>
       </DialogContent>
     </Dialog>
   );

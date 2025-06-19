@@ -1,14 +1,16 @@
 import React, { useRef, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../utils/firebase';
+import { auth, db } from '../utils/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import ReCAPTCHA from 'react-google-recaptcha';
 
 import {
   Dialog, DialogTitle, DialogContent,
   Typography, Button, TextField,
   Divider, Link, IconButton, Box,
-  CircularProgress, Alert, Grid, Card, CardActionArea
+  CircularProgress, Alert, Grid, Card, CardActionArea,
+  FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 
 import CloseIcon from '@mui/icons-material/Close';
@@ -23,7 +25,9 @@ const RegisterModal = ({ open, onClose, onSwitchToLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [role, setRole] = useState('');
   const [formErrors, setFormErrors] = useState({});
+  const [roleError, setRoleError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -36,7 +40,9 @@ const RegisterModal = ({ open, onClose, onSwitchToLogin }) => {
     setEmail('');
     setPassword('');
     setConfirmPassword('');
+    setRole('');
     setFormErrors({});
+    setRoleError('');
     setSubmitError('');
     setSubmitSuccess(false);
     recaptchaRef.current?.reset();
@@ -54,11 +60,23 @@ const RegisterModal = ({ open, onClose, onSwitchToLogin }) => {
       return;
     }
 
+    if (!role) {
+      setRoleError('Veuillez sélectionner un rôle.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      console.log("Utilisateur créé :", userCredential.user);
+      const user = userCredential.user;
+
+      await setDoc(doc(db, "users", user.uid), {
+        email,
+        role,
+        createdAt: new Date()
+      });
+
       setSubmitSuccess(true);
       setTimeout(() => {
         onClose();
@@ -168,6 +186,28 @@ const RegisterModal = ({ open, onClose, onSwitchToLogin }) => {
             helperText={formErrors.confirmPassword}
           />
 
+          <FormControl fullWidth sx={{ mb: 2 }} error={!!roleError}>
+            <InputLabel id="role-label">Sélectionnez un rôle</InputLabel>
+            <Select
+              labelId="role-label"
+              value={role}
+              label="Sélectionnez un rôle"
+              onChange={(e) => {
+                setRole(e.target.value);
+                setRoleError('');
+              }}
+            >
+              <MenuItem value="admin">Admin</MenuItem>
+              <MenuItem value="creator">Créateur</MenuItem>
+              <MenuItem value="student">Étudiant</MenuItem>
+            </Select>
+            {roleError && (
+              <Typography variant="caption" color="error" sx={{ mt: 1 }}>
+                {roleError}
+              </Typography>
+            )}
+          </FormControl>
+
           <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center', flexDirection: 'column' }}>
             <ReCAPTCHA
               ref={recaptchaRef}
@@ -203,55 +243,41 @@ const RegisterModal = ({ open, onClose, onSwitchToLogin }) => {
           )}
         </Box>
 
-        
-
         <Box sx={{ mt: 3, textAlign: 'center' }}>
-  {/* Lien Contactez-nous */}
-  <Typography variant="body2" sx={{ mb: 1 }}>
-    <Link href="#" onClick={(e) => e.preventDefault()}>
-      Contactez-nous
-    </Link>
-  </Typography>
-  
-  {/* Lien Conditions générales */}
-  <Typography variant="body2" sx={{ mb: 2 }}>
-    <Link href="#" onClick={(e) => e.preventDefault()}>
-      Conditions générales
-    </Link>
-  </Typography>
-
-  {/* Lien de connexion */}
-  <Typography variant="body2">
-    Déjà un compte ?{' '}
-    <Link
-      component="button"
-      variant="body2"
-      onClick={(e) => {
-        e.preventDefault();
-        onSwitchToLogin();
-      }}
-      sx={{ 
-        cursor: 'pointer',
-        fontWeight: 'bold',
-        '&:hover': {
-          textDecoration: 'underline'
-        }
-      }}
-    >
-      Se connecter
-    </Link>
-  </Typography>
-</Box>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            <Link href="#" onClick={(e) => e.preventDefault()}>
+              Contactez-nous
+            </Link>
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            <Link href="#" onClick={(e) => e.preventDefault()}>
+              Conditions générales
+            </Link>
+          </Typography>
+          <Typography variant="body2">
+            Déjà un compte ?{' '}
+            <Link
+              component="button"
+              variant="body2"
+              onClick={(e) => {
+                e.preventDefault();
+                onSwitchToLogin();
+              }}
+              sx={{ cursor: 'pointer', fontWeight: 'bold', '&:hover': { textDecoration: 'underline' } }}
+            >
+              Se connecter
+            </Link>
+          </Typography>
+        </Box>
       </DialogContent>
     </Dialog>
   );
 };
 
-// ✅ PropTypes
 RegisterModal.propTypes = {
   open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
-  onSwitchToLogin: PropTypes.func, // optionnel
+  onSwitchToLogin: PropTypes.func,
 };
 
 export default RegisterModal;
