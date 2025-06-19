@@ -100,16 +100,29 @@ const CourseList = ({ filters = {} }) => {
         </Typography>
       ) : (
         <>
-          <Grid container spacing={3}>
-            {paginatedCourses.map(course => (
-              <Grid item xs={12} sm={6} md={4} key={course.id}>
-                <CourseCard 
-                  course={course} 
-                  userProgress={currentUser?.progress} 
-                />
-              </Grid>
-            ))}
-          </Grid>
+        
+          <Grid container spacing={3} justifyContent="center">
+  {paginatedCourses.map(course => (
+    <Grid
+      item
+      xs={12}
+      md={6}
+      key={course.id}
+      sx={{
+        display: 'flex',
+        justifyContent: 'center',
+      }}
+    >
+      <Box sx={{ width: '100%', maxWidth: 500 }}>
+        <CourseCard 
+          course={course} 
+          userProgress={currentUser?.progress} 
+        />
+      </Box>
+    </Grid>
+  ))}
+</Grid>
+
 
           {pageCount > 1 && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
@@ -120,9 +133,13 @@ const CourseList = ({ filters = {} }) => {
                 color="primary"
               />
             </Box>
+            
           )}
+          
         </>
+        
       )}
+      
     </Box>
   );
 };

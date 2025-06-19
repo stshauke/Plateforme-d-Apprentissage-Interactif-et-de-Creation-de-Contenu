@@ -70,14 +70,14 @@ const CourseCard = ({ course, userProgress }) => {
 
       <Box sx={{ p: 2 }}>
         <Button
-          component={Link}
-          to={`/courses/${course.id}`}
-          variant="contained"
-          fullWidth
-          color={isCompleted ? 'success' : 'primary'}
-        >
-          {isCompleted ? 'Revoir le cours' : 'Commencer'}
-        </Button>
+  component={Link}
+  to={`/courses/${course.id}/lessons`}  // ← Rediriger directement vers les leçons
+  variant="contained"
+  fullWidth
+  color={isCompleted ? 'success' : 'primary'}
+>
+  {isCompleted ? 'Revoir le cours' : 'Commencer'}
+</Button>
       </Box>
     </Card>
   );

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import CoursePage from './pages/CoursePage';
 import CoursesPage from './pages/CoursesPage';
+import CourseLessonsPage from './pages/CourseLessonsPage'; // Importez le nouveau composant
 import CreateCoursePage from './pages/CreateCoursePage';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -10,7 +11,6 @@ import LoginModal from './components/LoginModal';
 import RegisterModal from './components/RegisterModal';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
-
 import { Box, CssBaseline } from '@mui/material';
 
 const App = () => {
@@ -52,6 +52,8 @@ const App = () => {
               <Route path="/" element={<Home />} />
               <Route path="/courses" element={<CoursesPage />} />
               <Route path="/courses/:courseId" element={<CoursePage />} />
+              {/* Ajoutez cette nouvelle route */}
+              <Route path="/courses/:courseId/lessons" element={<CourseLessonsPage />} />
               <Route
                 path="/create-course"
                 element={
