@@ -27,8 +27,8 @@ import CreateLessonForm from '../components/courses/CreateLessonForm';
 
 const CourseLessonsPage = () => {
   const { courseId } = useParams();
-  const navigate = useNavigate(); 
-  const { currentUser } = useAuth(); // ✅ doit être ici, pas dehors
+  const navigate = useNavigate();
+  const { currentUser } = useAuth();  // ✅ currentUser disponible ici
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [state, setState] = useState({
@@ -38,7 +38,9 @@ const CourseLessonsPage = () => {
     userProgress: {}
   });
 
-  const isInstructor = currentUser?.uid === state.course?.createdBy;  useEffect(() => {
+  const isInstructor = currentUser?.uid === state.course?.createdBy;
+  
+  useEffect(() => {
     const fetchData = async () => {
       try {
         setState(prev => ({ ...prev, loading: true }));
@@ -168,6 +170,8 @@ const CourseLessonsPage = () => {
       </Container>
     );
   }
+console.log("currentUser:", currentUser);
+console.log("course.createdBy:", state.course?.createdBy);
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -189,15 +193,16 @@ const CourseLessonsPage = () => {
         {/* ===== PLACEZ LE BLOC DE DÉBOGAGE ICI ===== */}
     {/* DEBUG - À mettre juste avant le bouton Ajouter une leçon */}
     <Box sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
-      <Typography variant="body2">
-        Debug Info:<br />
-        User ID: {currentUser?.uid || 'Non connecté'}<br />
-        Instructor ID: {state.course?.instructorId || 'Non défini'}<br />
-        Is Instructor: {(currentUser?.uid === state.course?.instructorId).toString()}
-      </Typography>
-    </Box>
+  <Typography variant="body2">
+    Debug Info:<br />
+    User ID: {currentUser?.uid || 'Non connecté'}<br />
+    Créé par (course.createdBy) : {state.course?.createdBy || 'Non défini'}<br />
+    Est instructeur : {(currentUser?.uid === state.course?.createdBy).toString()}
+  </Typography>
+</Box>
+
       {/* Bouton pour créer une nouvelle leçon */}
-      {currentUser?.uid === state.course.instructorId && (
+     {isInstructor && (
   <Button 
     variant="contained" 
     onClick={() => setShowCreateForm(!showCreateForm)}
@@ -241,12 +246,12 @@ const CourseLessonsPage = () => {
             {state.lessons.map((lesson, index) => (
               <LessonItem
                 key={lesson.id}
-  lesson={lesson}
-  index={index}
-  isCompleted={state.userProgress[lesson.id]?.completed || false}
-  onMarkCompleted={handleMarkCompleted}
-  canPublish={currentUser?.uid === state.course.instructorId}
-  onPublish={handlePublish}
+                  lesson={lesson}
+                  index={index}
+                  isCompleted={state.userProgress[lesson.id]?.completed || false}
+                  onMarkCompleted={handleMarkCompleted}
+                 canPublish={currentUser?.uid === state.course?.createdBy}
+                  onPublish={handlePublish}
               />
             ))}
           </Box>

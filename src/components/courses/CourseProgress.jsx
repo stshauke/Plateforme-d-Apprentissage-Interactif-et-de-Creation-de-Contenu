@@ -3,42 +3,48 @@ import PropTypes from 'prop-types';
 import { Box, Typography, LinearProgress } from '@mui/material';
 
 const CourseProgress = ({ courseId, lessons, userProgress }) => {
-  // Calcul du nombre de leçons complétées
-  const completedLessonsCount = React.useMemo(() => (
-    lessons.filter(lesson => userProgress?.lessons?.[lesson.id]?.completed).length
-  ), [lessons, userProgress]);
+  // Compte des leçons publiées seulement
+  const publishedLessons = lessons.filter(lesson => lesson.isPublished);
 
-  // Calcul du pourcentage de progression
-  const progressPercentage = React.useMemo(() => (
-    lessons.length > 0 ? Math.round((completedLessonsCount / lessons.length) * 100) : 0
-  ), [completedLessonsCount, lessons.length]);
+  // Compte des leçons complétées (en utilisant directement userProgress)
+  const completedLessonsCount = publishedLessons.filter(
+    lesson => userProgress?.[lesson.id]?.completed
+  ).length;
+
+  const totalLessons = publishedLessons.length;
+
+  const progressPercentage = totalLessons > 0
+    ? Math.round((completedLessonsCount / totalLessons) * 100)
+    : 0;
 
   return (
     <Box sx={{ mb: 3 }}>
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        mb: 1,
-        alignItems: 'center'
-      }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          mb: 1,
+          alignItems: 'center'
+        }}
+      >
         <Typography variant="body1" component="p">
           Progression: {progressPercentage}%
         </Typography>
         <Typography variant="body1" component="p">
-          {completedLessonsCount} sur {lessons.length} leçons terminées
+          {completedLessonsCount} sur {totalLessons} leçons terminées
         </Typography>
       </Box>
-      
-      <LinearProgress 
-        variant="determinate" 
-        value={progressPercentage} 
-        sx={{ 
-          height: 10, 
+
+      <LinearProgress
+        variant="determinate"
+        value={progressPercentage}
+        sx={{
+          height: 10,
           borderRadius: 5,
           '& .MuiLinearProgress-bar': {
             borderRadius: 5
           }
-        }} 
+        }}
       />
     </Box>
   );
@@ -49,32 +55,16 @@ CourseProgress.propTypes = {
   lessons: PropTypes.arrayOf(
     PropTypes.shape({
       id: PropTypes.string.isRequired,
-      // Ajoutez d'autres propriétés des leçons si nécessaire
+      isPublished: PropTypes.bool,
       title: PropTypes.string,
       duration: PropTypes.string
     })
   ).isRequired,
-  userProgress: PropTypes.shape({
-    lessons: PropTypes.objectOf(
-      PropTypes.shape({
-        completed: PropTypes.bool,
-        completedAt: PropTypes.instanceOf(Date),
-        // Ajoutez d'autres propriétés de progression si nécessaire
-      })
-    ),
-    courses: PropTypes.objectOf(
-      PropTypes.shape({
-        progress: PropTypes.number
-      })
-    )
-  })
+  userProgress: PropTypes.object
 };
 
 CourseProgress.defaultProps = {
-  userProgress: {
-    lessons: {},
-    courses: {}
-  }
+  userProgress: {}
 };
 
 export default React.memo(CourseProgress);

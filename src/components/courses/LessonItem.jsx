@@ -36,6 +36,7 @@ const LessonItem = ({ lesson, index, isCompleted, onMarkCompleted, canPublish, o
     }
     return null;
   };
+console.log('canPublish:', canPublish, 'lesson.isPublished:', lesson.isPublished);
 
   return (
     <Card variant="outlined" sx={{ mb: 2 }}>
@@ -81,16 +82,16 @@ const LessonItem = ({ lesson, index, isCompleted, onMarkCompleted, canPublish, o
               </Button>
             )}
 
-            {canPublish && isLocked && (
-              <Button
-                variant="contained"
-                size="small"
-                color="warning"
-                onClick={() => onPublish(lesson.id)}
-              >
-                Publier
-              </Button>
-            )}
+            {canPublish && !lesson.isPublished && (
+  <Button
+    variant="contained"
+    size="small"
+    color="warning"
+    onClick={() => onPublish(lesson.id)}
+  >
+    Publier
+  </Button>
+)}
           </Box>
         </Box>
       </CardContent>
