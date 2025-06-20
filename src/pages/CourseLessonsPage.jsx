@@ -7,7 +7,12 @@ import {
   Button,
   CircularProgress,
   Alert,
-  Breadcrumbs
+  Breadcrumbs,
+  Divider,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent
 } from '@mui/material';
 import { 
   doc, 
@@ -17,29 +22,40 @@ import {
   where, 
   orderBy, 
   getDocs,
-  setDoc 
+  setDoc,
+  addDoc
 } from 'firebase/firestore';
 import { db } from '../utils/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import LessonItem from '../components/courses/LessonItem';
 import CourseProgress from '../components/courses/CourseProgress';
 import CreateLessonForm from '../components/courses/CreateLessonForm';
+import QuizForm from '../components/quizzes/CreateQuizForm';
+import QuizPlayer from '../components/quizzes/CreateQuizPlayer';
+import AddIcon from '@mui/icons-material/Add';
+import QuizIcon from '@mui/icons-material/Quiz';
 
 const CourseLessonsPage = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();  // ✅ currentUser disponible ici
+  const { currentUser } = useAuth();
 
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showQuizForm, setShowQuizForm] = useState(false);
+  const [selectedQuiz, setSelectedQuiz] = useState(null);
+  const [selectedLessonForQuiz, setSelectedLessonForQuiz] = useState(null);
   const [state, setState] = useState({
     loading: true,
     course: null,
     lessons: [],
-    userProgress: {}
+    quizzes: [],
+    userProgress: {},
+    userQuizResults: {},
+    error: null
   });
 
   const isInstructor = currentUser?.uid === state.course?.createdBy;
-  
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -59,20 +75,48 @@ const CourseLessonsPage = () => {
         );
         const lessonsSnapshot = await getDocs(lessonsQuery);
 
-        // 3. Fetch user progress
+        // 3. Fetch quizzes for all lessons
+              const quizzesQuery = query(
+          collection(db, 'quizzes'),
+          where('courseId', '==', courseId),
+          orderBy('createdAt', 'desc') // Ajoutez un ordre pour plus de cohérence
+        );
+        const quizzesSnapshot = await getDocs(quizzesQuery);
+
+        // 4. Fetch user progress
         let userProgress = {};
+        let userQuizResults = {};
         if (currentUser) {
+          // Lesson progress
           const progressDoc = await getDoc(
             doc(db, 'users', currentUser.uid, 'progress', courseId)
           );
           userProgress = progressDoc.exists() ? progressDoc.data() : {};
+
+          // Quiz results
+          const quizIds = quizzesSnapshot.docs.map(q => q.id);
+
+if (quizIds.length > 0) {
+  const resultsQuery = query(
+    collection(db, 'users', currentUser.uid, 'quizResults'),
+    where('quizId', 'in', quizIds)
+  );
+  const resultsSnapshot = await getDocs(resultsQuery);
+  resultsSnapshot.forEach(doc => {
+    userQuizResults[doc.data().quizId] = doc.data();
+  });
+}
+
         }
 
         setState({
           loading: false,
           course: { id: courseDoc.id, ...courseDoc.data() },
           lessons: lessonsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })),
-          userProgress
+          quizzes: quizzesSnapshot.docs.map(d => ({ id: d.id, ...d.data() })),
+          userProgress,
+          userQuizResults,
+          error: null
         });
 
       } catch (error) {
@@ -118,24 +162,41 @@ const CourseLessonsPage = () => {
       console.error("Error updating progress:", error);
     }
   };
-  const handlePublish = async (lessonId) => {
-  try {
-    await setDoc(
-      doc(db, 'lessons', lessonId),
-      { isPublished: true },
-      { merge: true }
-    );
 
-    setState((prev) => ({
-      ...prev,
-      lessons: prev.lessons.map((l) =>
-        l.id === lessonId ? { ...l, isPublished: true } : l
-      ),
-    }));
-  } catch (err) {
-    console.error('Erreur lors de la publication de la leçon :', err);
-  }
-};
+  const handlePublish = async (lessonId) => {
+    try {
+      await setDoc(
+        doc(db, 'lessons', lessonId),
+        { isPublished: true },
+        { merge: true }
+      );
+
+      setState(prev => ({
+        ...prev,
+        lessons: prev.lessons.map(l =>
+          l.id === lessonId ? { ...l, isPublished: true } : l
+        ),
+      }));
+    } catch (err) {
+      console.error('Erreur lors de la publication de la leçon :', err);
+    }
+  };
+
+  const handleQuizCreated = async (quizId) => {
+    try {
+      const quizDoc = await getDoc(doc(db, 'quizzes', quizId));
+      if (quizDoc.exists()) {
+        setState(prev => ({
+          ...prev,
+          quizzes: [...prev.quizzes, { id: quizDoc.id, ...quizDoc.data() }]
+        }));
+      }
+      setShowQuizForm(false);
+      setSelectedLessonForQuiz(null);
+    } catch (error) {
+      console.error("Error updating quizzes list:", error);
+    }
+  };
 
   if (state.loading) {
     return (
@@ -170,8 +231,6 @@ const CourseLessonsPage = () => {
       </Container>
     );
   }
-console.log("currentUser:", currentUser);
-console.log("course.createdBy:", state.course?.createdBy);
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -190,29 +249,39 @@ console.log("course.createdBy:", state.course?.createdBy);
           {state.course.description}
         </Typography>
       </Box>
-        {/* ===== PLACEZ LE BLOC DE DÉBOGAGE ICI ===== */}
-    {/* DEBUG - À mettre juste avant le bouton Ajouter une leçon */}
-    <Box sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
-  <Typography variant="body2">
-    Debug Info:<br />
-    User ID: {currentUser?.uid || 'Non connecté'}<br />
-    Créé par (course.createdBy) : {state.course?.createdBy || 'Non défini'}<br />
-    Est instructeur : {(currentUser?.uid === state.course?.createdBy).toString()}
-  </Typography>
-</Box>
 
-      {/* Bouton pour créer une nouvelle leçon */}
-     {isInstructor && (
-  <Button 
-    variant="contained" 
-    onClick={() => setShowCreateForm(!showCreateForm)}
-    sx={{ mb: 3 }}
-  >
-    {showCreateForm ? 'Annuler' : 'Ajouter une leçon'}
-  </Button>
-)}
+      <CourseProgress
+        courseId={courseId}
+        lessons={state.lessons}
+        quizzes={state.quizzes}
+        userProgress={state.userProgress}
+        userQuizResults={state.userQuizResults}
+      />
 
-      {/* Formulaire de création */}
+      {/* Actions pour les instructeurs */}
+      {isInstructor && (
+        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setShowCreateForm(!showCreateForm)}
+          >
+            {showCreateForm ? 'Annuler' : 'Ajouter une leçon'}
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<QuizIcon />}
+            onClick={() => {
+              setSelectedLessonForQuiz(null);
+              setShowQuizForm(true);
+            }}
+          >
+            Créer un quiz pour le cours
+          </Button>
+        </Box>
+      )}
+
+      {/* Formulaire de création de leçon */}
       {showCreateForm && (
         <CreateLessonForm 
           courseId={courseId}
@@ -226,12 +295,7 @@ console.log("course.createdBy:", state.course?.createdBy);
         />
       )}
 
-      <CourseProgress
-        courseId={courseId}
-        lessons={state.lessons}
-        userProgress={state.userProgress}
-      />
-
+      {/* Liste des leçons */}
       <Box sx={{ mt: 4 }}>
         <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
           Liste des leçons
@@ -244,19 +308,151 @@ console.log("course.createdBy:", state.course?.createdBy);
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
             {state.lessons.map((lesson, index) => (
-              <LessonItem
-                key={lesson.id}
+              <Box key={lesson.id}>
+                <LessonItem
                   lesson={lesson}
                   index={index}
                   isCompleted={state.userProgress[lesson.id]?.completed || false}
                   onMarkCompleted={handleMarkCompleted}
-                 canPublish={currentUser?.uid === state.course?.createdBy}
+                  canPublish={isInstructor}
                   onPublish={handlePublish}
-              />
+                />
+                
+                {/* Quiz associés à cette leçon */}
+                {state.quizzes
+                  .filter(q => q.lessonId === lesson.id)
+                  .map(quiz => (
+                    <Box 
+                      key={quiz.id} 
+                      sx={{ 
+                        ml: 4, 
+                        mt: 1, 
+                        p: 2, 
+                        bgcolor: '#f9f9f9', 
+                        borderRadius: 1,
+                        borderLeft: '3px solid #3f51b5'
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <QuizIcon color="primary" sx={{ mr: 1 }} />
+                        <Typography variant="subtitle1">{quiz.title}</Typography>
+                      </Box>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        {quiz.description}
+                      </Typography>
+                      {state.userQuizResults[quiz.id] ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Typography variant="body2" sx={{ mr: 2 }}>
+                            Score: {state.userQuizResults[quiz.id].score} /{' '}
+                            {state.quizzes.find(q => q.id === quiz.id)?.questions?.reduce((sum, q) => sum + q.points, 0) || '?'}
+                          </Typography>
+                          <Button 
+                            size="small" 
+                            onClick={() => setSelectedQuiz(quiz.id)}
+                          >
+                            Voir les résultats
+                          </Button>
+                        </Box>
+                      ) : (
+                       <Button
+  variant="contained"
+  size="small"
+  onClick={() => {
+    const fullQuiz = state.quizzes.find(q => q.id === quiz.id);
+    if (!fullQuiz.questions || fullQuiz.questions.length === 0) {
+      alert("Ce quiz n'a aucune question");
+      return;
+    }
+    setSelectedQuiz(fullQuiz.id); // Passez seulement l'ID
+  }}
+>
+  Passer le quiz
+</Button>
+                      )}
+                      {isInstructor && (
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setSelectedLessonForQuiz(lesson.id);
+                            setShowQuizForm(true);
+                          }}
+                          sx={{ ml: 1 }}
+                        >
+                          <AddIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Box>
+                  ))}
+                
+                {/* Bouton pour ajouter un quiz à cette leçon (instructeur) */}
+                {isInstructor && (
+                  <Button
+                    size="small"
+                    startIcon={<AddIcon />}
+                    onClick={() => {
+                      setSelectedLessonForQuiz(lesson.id);
+                      setShowQuizForm(true);
+                    }}
+                    sx={{ ml: 4, mt: 1 }}
+                  >
+                    Ajouter un quiz
+                  </Button>
+                )}
+              </Box>
             ))}
           </Box>
         )}
       </Box>
+
+      {/* Formulaire de création de quiz */}
+      <Dialog
+        open={showQuizForm}
+        onClose={() => {
+          setShowQuizForm(false);
+          setSelectedLessonForQuiz(null);
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          {selectedLessonForQuiz 
+            ? `Créer un quiz pour la leçon ${state.lessons.find(l => l.id === selectedLessonForQuiz)?.title || ''}`
+            : 'Créer un quiz pour le cours'}
+        </DialogTitle>
+        <DialogContent>
+          <QuizForm
+            courseId={courseId}
+            lessonId={selectedLessonForQuiz}
+            onQuizCreated={handleQuizCreated}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Player de quiz */}
+      <Dialog
+        open={!!selectedQuiz}
+        onClose={() => setSelectedQuiz(null)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogContent>
+          {selectedQuiz && (
+            <QuizPlayer 
+              quizId={selectedQuiz} 
+              onClose={() => setSelectedQuiz(null)}
+              onQuizCompleted={(result) => {
+                setState(prev => ({
+                  ...prev,
+                  userQuizResults: {
+                    ...prev.userQuizResults,
+                    [result.quizId]: result
+                  }
+                }));
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Container>
   );
 };

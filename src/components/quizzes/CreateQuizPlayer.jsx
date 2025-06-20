@@ -19,12 +19,14 @@ import {
   where, 
   getDocs, 
   doc, 
+  getDoc,  // <-- Ajoutez ceci
+  orderBy, // <-- Vérifiez si vous en avez besoin
   setDoc 
 } from 'firebase/firestore';
-import { db } from '../utils/firebase';
-import { useAuth } from '../contexts/AuthContext';
+import { db } from '../../utils/firebase';
+import { useAuth } from '../../contexts/AuthContext';
 
-const QuizPlayer = ({ quizId }) => {
+const CreateQuizPlayer = ({ quizId }) => {
   const { currentUser } = useAuth();
   const [state, setState] = useState({
     loading: true,
@@ -308,4 +310,4 @@ const QuizPlayer = ({ quizId }) => {
   );
 };
 
-export default QuizPlayer;
+export default CreateQuizPlayer;

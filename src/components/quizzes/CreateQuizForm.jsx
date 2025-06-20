@@ -14,8 +14,8 @@ import {
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { doc, setDoc, collection, addDoc } from 'firebase/firestore';
-import { db } from '../utils/firebase';
-import { useAuth } from '../contexts/AuthContext';
+import { db } from '../../utils/firebase';
+import { useAuth } from '../../contexts/AuthContext';
 
 const questionTypes = [
   { value: 'multiple_choice', label: 'Choix multiple' },
@@ -23,7 +23,7 @@ const questionTypes = [
   { value: 'short_answer', label: 'Réponse courte' }
 ];
 
-const QuizForm = ({ lessonId, onQuizCreated }) => {
+const CreateQuizForm = ({ lessonId, onQuizCreated }) => {
   const { currentUser } = useAuth();
   const [quiz, setQuiz] = useState({
     title: '',
@@ -281,4 +281,4 @@ const QuizForm = ({ lessonId, onQuizCreated }) => {
   );
 };
 
-export default QuizForm;
+export default CreateQuizForm;
