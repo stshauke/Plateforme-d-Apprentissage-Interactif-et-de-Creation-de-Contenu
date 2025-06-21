@@ -23,7 +23,7 @@ const questionTypes = [
   { value: 'short_answer', label: 'Réponse courte' }
 ];
 
-const CreateQuizForm = ({ lessonId, onQuizCreated }) => {
+const CreateQuizForm = ({  courseId,lessonId, onQuizCreated }) => {
   const { currentUser } = useAuth();
   const [quiz, setQuiz] = useState({
     title: '',
@@ -74,7 +74,8 @@ const CreateQuizForm = ({ lessonId, onQuizCreated }) => {
     try {
       // Créer le quiz dans Firestore
       const quizRef = await addDoc(collection(db, 'quizzes'), {
-        lessonId,
+        courseId, 
+         lessonId: lessonId || null,
         title: quiz.title,
         description: quiz.description,
         createdBy: currentUser.uid,

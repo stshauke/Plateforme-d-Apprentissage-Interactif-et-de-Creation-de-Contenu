@@ -6,293 +6,364 @@ import {
   Radio, 
   RadioGroup, 
   FormControlLabel, 
-  FormControl, 
-  FormLabel,
+  FormControl,
   TextField,
   Alert,
   CircularProgress,
-  Divider
+  Divider,
+  LinearProgress
 } from '@mui/material';
 import { 
   collection, 
   query, 
-  where, 
   getDocs, 
   doc, 
-  getDoc,  // <-- Ajoutez ceci
-  orderBy, // <-- Vérifiez si vous en avez besoin
+  getDoc,
+  orderBy,
   setDoc 
 } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 
-const CreateQuizPlayer = ({ quizId }) => {
+const CreateQuizPlayer = ({ quizId, onClose }) => {
   const { currentUser } = useAuth();
-  const [state, setState] = useState({
-    loading: true,
-    quiz: null,
-    questions: [],
-    currentQuestionIndex: 0,
-    answers: {},
-    submitted: false,
-    score: 0,
-    error: null
-  });
+  const [quiz, setQuiz] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const fetchQuiz = async () => {
+    const fetchQuizData = async () => {
       try {
-        // Récupérer le quiz
+        setLoading(true);
+        
+        // Récupérer les infos du quiz
         const quizDoc = await getDoc(doc(db, 'quizzes', quizId));
         if (!quizDoc.exists()) {
           throw new Error('Quiz non trouvé');
         }
+        setQuiz({ id: quizDoc.id, ...quizDoc.data() });
+
+        // Préparer la requête questions
+        let questionsQuery;
+        // Si tu as un champ order dans les questions, garde orderBy, sinon retire-le
+        try {
+          questionsQuery = query(
+            collection(db, 'quizzes', quizId, 'questions'),
+            orderBy('order', 'asc')
+          );
+          await getDocs(questionsQuery); // juste pour vérifier l'existence du champ 'order'
+        } catch {
+          // Si 'order' n'existe pas, on récupère sans orderBy
+          questionsQuery = collection(db, 'quizzes', quizId, 'questions');
+        }
 
         // Récupérer les questions
-        const questionsQuery = query(
-          collection(db, 'quizzes', quizId, 'questions'),
-          orderBy('createdAt', 'asc')
-        );
         const questionsSnapshot = await getDocs(questionsQuery);
-
-        setState({
-          ...state,
-          loading: false,
-          quiz: quizDoc.data(),
-          questions: questionsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })),
-          answers: {}
-        });
-      } catch (error) {
-        setState({
-          ...state,
-          loading: false,
-          error: error.message
-        });
+        
+        const loadedQuestions = questionsSnapshot.docs.map(d => ({
+          id: d.id,
+          ...d.data()
+        }));
+        
+        setQuestions(loadedQuestions);
+        setLoading(false);
+      } catch (err) {
+        console.error("Erreur de chargement du quiz:", err);
+        setError(err.message);
+        setLoading(false);
       }
     };
 
-    fetchQuiz();
+    if (quizId) {
+      fetchQuizData();
+    }
   }, [quizId]);
 
-  const handleAnswerChange = (questionId, answer) => {
-    setState(prev => ({
+  const handleAnswerChange = (questionId, value) => {
+    setAnswers(prev => ({
       ...prev,
-      answers: {
-        ...prev.answers,
-        [questionId]: answer
-      }
+      [questionId]: value
     }));
+  };
+
+  const calculateScore = () => {
+    let score = 0;
+    const calculatedResults = {};
+
+    questions.forEach(question => {
+      const userAnswer = answers[question.id];
+      // Pour éviter erreur type, on convertit en string
+      const correctAnswer = question.correctAnswer?.toString() || '';
+      const userAnsStr = userAnswer?.toString() || '';
+
+      const isCorrect = userAnsStr === correctAnswer;
+
+      calculatedResults[question.id] = {
+        question: question.text,
+        userAnswer,
+        isCorrect,
+        correctAnswer,
+        explanation: question.explanation,
+        points: question.points || 0
+      };
+
+      if (isCorrect) {
+        score += question.points || 0;
+      }
+    });
+
+    return { score, calculatedResults };
   };
 
   const handleSubmit = async () => {
     try {
-      // Calculer le score
-      let score = 0;
-      const results = {};
-      
-      state.questions.forEach(question => {
-        const userAnswer = state.answers[question.id];
-        const isCorrect = userAnswer === question.correctAnswer;
-        
-        results[question.id] = {
-          answer: userAnswer,
-          isCorrect,
-          correctAnswer: question.correctAnswer,
-          explanation: question.explanation
-        };
-        
-        if (isCorrect) {
-          score += question.points;
-        }
-      });
-      
-      // Enregistrer les résultats si l'utilisateur est connecté
+      setSubmitting(true);
+      const { score, calculatedResults } = calculateScore();
+
       if (currentUser) {
         await setDoc(doc(db, 'users', currentUser.uid, 'quizResults', quizId), {
           quizId,
           userId: currentUser.uid,
           score,
-          total: state.questions.reduce((sum, q) => sum + q.points, 0),
+          totalPoints: questions.reduce((sum, q) => sum + (q.points || 0), 0),
           completedAt: new Date().toISOString(),
-          results
+          results: calculatedResults
         });
       }
-      
-      setState(prev => ({
-        ...prev,
-        submitted: true,
+
+      setResults({
         score,
-        results
-      }));
-    } catch (error) {
-      console.error("Error submitting quiz:", error);
-      setState(prev => ({
-        ...prev,
-        error: "Une erreur est survenue lors de l'envoi du quiz"
-      }));
+        totalPoints: questions.reduce((sum, q) => sum + (q.points || 0), 0),
+        details: calculatedResults
+      });
+    } catch (err) {
+      console.error("Erreur lors de la soumission:", err);
+      setError("Une erreur est survenue lors de l'envoi du quiz");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleNextQuestion = () => {
-    setState(prev => ({
-      ...prev,
-      currentQuestionIndex: prev.currentQuestionIndex + 1
-    }));
+  const navigateQuestion = (direction) => {
+    setCurrentQuestionIndex(prev => {
+      const newIndex = direction === 'next' ? prev + 1 : prev - 1;
+      return Math.max(0, Math.min(newIndex, questions.length - 1));
+    });
   };
 
-  const handlePrevQuestion = () => {
-    setState(prev => ({
-      ...prev,
-      currentQuestionIndex: prev.currentQuestionIndex - 1
-    }));
-  };
-
-  if (state.loading) {
+  if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+      <Box sx={{ p: 4, textAlign: 'center' }}>
         <CircularProgress />
+        <Typography sx={{ mt: 2 }}>Chargement du quiz...</Typography>
       </Box>
     );
   }
 
-  if (state.error) {
+  if (error) {
     return (
       <Alert severity="error" sx={{ m: 2 }}>
-        {state.error}
+        {error}
+        <Button sx={{ ml: 2 }} onClick={() => window.location.reload()}>
+          Réessayer
+        </Button>
       </Alert>
     );
   }
 
-  if (state.submitted) {
+  if (!quiz) {
+    return (
+      <Alert severity="warning" sx={{ m: 2 }}>
+        Quiz non disponible
+      </Alert>
+    );
+  }
+
+  if (results) {
     return (
       <Box sx={{ p: 3 }}>
         <Typography variant="h5" gutterBottom>
-          Résultats du quiz
+          Résultats du quiz: {quiz.title}
         </Typography>
-        <Typography variant="h6" gutterBottom>
-          Score: {state.score} / {state.questions.reduce((sum, q) => sum + q.points, 0)}
-        </Typography>
-        
-        <Box sx={{ mt: 3 }}>
-          {state.questions.map((question, index) => (
-            <Box key={question.id} sx={{ mb: 3, p: 2, border: '1px solid #eee', borderRadius: 1 }}>
+
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6">
+            Score final: {results.score}/{results.totalPoints} points
+          </Typography>
+          <LinearProgress 
+            variant="determinate" 
+            value={(results.score / results.totalPoints) * 100} 
+            sx={{ height: 10, mt: 1 }}
+          />
+        </Box>
+
+        <Divider sx={{ my: 3 }} />
+
+        {questions.map((question, idx) => {
+          const detail = results.details[question.id] || {};
+          return (
+            <Box key={question.id} sx={{ 
+              mb: 3, 
+              p: 2, 
+              border: '1px solid', 
+              borderColor: detail.isCorrect ? 'success.light' : 'error.light',
+              borderRadius: 1,
+              backgroundColor: detail.isCorrect ? 'success.50' : 'error.50'
+            }}>
               <Typography fontWeight="bold">
-                Question {index + 1}: {question.text}
+                Question {idx + 1}: {question.text} ({question.points || 0} point(s))
               </Typography>
-              
+
               <Typography sx={{ mt: 1 }}>
-                Votre réponse: {state.results[question.id]?.answer || 'Non répondue'}
+                <strong>Votre réponse:</strong> {detail.userAnswer ?? 'Aucune réponse'}
               </Typography>
-              
-              <Typography color={state.results[question.id]?.isCorrect ? 'success.main' : 'error.main'}>
-                {state.results[question.id]?.isCorrect ? 'Correct' : 'Incorrect'}
-              </Typography>
-              
-              {!state.results[question.id]?.isCorrect && (
+
+              {!detail.isCorrect && (
                 <Typography sx={{ mt: 1 }}>
-                  Réponse correcte: {question.correctAnswer}
+                  <strong>Réponse correcte:</strong> {detail.correctAnswer}
                 </Typography>
               )}
-              
+
               {question.explanation && (
-                <Box sx={{ mt: 1, p: 1, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                <Box sx={{ mt: 2, p: 1.5, bgcolor: 'grey.100', borderRadius: 1 }}>
                   <Typography variant="body2">
                     <strong>Explication:</strong> {question.explanation}
                   </Typography>
                 </Box>
               )}
             </Box>
-          ))}
+          );
+        })}
+
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+          <Button 
+            variant="contained" 
+            onClick={onClose}
+          >
+            Terminer
+          </Button>
         </Box>
       </Box>
     );
   }
 
-  if (state.questions.length === 0) {
+  if (questions.length === 0) {
     return (
       <Alert severity="info" sx={{ m: 2 }}>
         Ce quiz ne contient aucune question.
+        <Button sx={{ ml: 2 }} onClick={onClose}>
+          Retour
+        </Button>
       </Alert>
     );
   }
 
-  const currentQuestion = state.questions[state.currentQuestionIndex];
+  const currentQuestion = questions[currentQuestionIndex];
+  const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
 
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h5" gutterBottom>
-        {state.quiz.title}
+        {quiz.title}
       </Typography>
-      
-      <Typography variant="body1" gutterBottom>
-        {state.quiz.description}
+
+      <Typography variant="body1" gutterBottom sx={{ mb: 3 }}>
+        {quiz.description}
       </Typography>
-      
-      <Divider sx={{ my: 2 }} />
-      
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="subtitle1" gutterBottom>
-          Question {state.currentQuestionIndex + 1} sur {state.questions.length}
-        </Typography>
-        
-        <Typography variant="h6" sx={{ mb: 2 }}>
+
+      <LinearProgress 
+        variant="determinate" 
+        value={progress} 
+        sx={{ height: 8, mb: 2 }}
+      />
+
+      <Typography variant="subtitle2" sx={{ mb: 3 }}>
+        Question {currentQuestionIndex + 1} sur {questions.length} • {currentQuestion.points || 0} point(s)
+      </Typography>
+
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h6" sx={{ mb: 3 }}>
           {currentQuestion.text}
         </Typography>
-        
+
         {currentQuestion.type === 'multiple_choice' && (
-          <FormControl component="fieldset">
+          <FormControl component="fieldset" fullWidth>
             <RadioGroup
-              value={state.answers[currentQuestion.id] || ''}
+              value={answers[currentQuestion.id] || ''}
               onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
             >
-              {currentQuestion.options.map((option, i) => (
+              {(currentQuestion.options || []).map((option, i) => (
                 <FormControlLabel 
                   key={i}
                   value={i.toString()}
                   control={<Radio />}
                   label={option}
+                  sx={{ mb: 1 }}
                 />
               ))}
             </RadioGroup>
           </FormControl>
         )}
-        
+
         {currentQuestion.type === 'true_false' && (
           <FormControl component="fieldset">
             <RadioGroup
-              value={state.answers[currentQuestion.id] || ''}
+              value={answers[currentQuestion.id] || ''}
               onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+              row
             >
-              <FormControlLabel value="true" control={<Radio />} label="Vrai" />
-              <FormControlLabel value="false" control={<Radio />} label="Faux" />
+              <FormControlLabel 
+                value="true" 
+                control={<Radio />} 
+                label="Vrai" 
+                sx={{ mr: 3 }}
+              />
+              <FormControlLabel 
+                value="false" 
+                control={<Radio />} 
+                label="Faux" 
+              />
             </RadioGroup>
           </FormControl>
         )}
-        
+
         {currentQuestion.type === 'short_answer' && (
           <TextField
             fullWidth
             variant="outlined"
-            value={state.answers[currentQuestion.id] || ''}
+            value={answers[currentQuestion.id] || ''}
             onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
             sx={{ mt: 1 }}
+            placeholder="Entrez votre réponse..."
           />
         )}
       </Box>
-      
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between',
+        pt: 2,
+        borderTop: '1px solid',
+        borderColor: 'divider'
+      }}>
         <Button
           variant="outlined"
-          onClick={handlePrevQuestion}
-          disabled={state.currentQuestionIndex === 0}
+          onClick={() => navigateQuestion('prev')}
+          disabled={currentQuestionIndex === 0}
         >
           Précédent
         </Button>
-        
-        {state.currentQuestionIndex < state.questions.length - 1 ? (
+
+        {currentQuestionIndex < questions.length - 1 ? (
           <Button
             variant="contained"
-            onClick={handleNextQuestion}
+            onClick={() => navigateQuestion('next')}
+            disabled={!answers[currentQuestion.id]}
           >
             Suivant
           </Button>
@@ -301,8 +372,9 @@ const CreateQuizPlayer = ({ quizId }) => {
             variant="contained"
             color="primary"
             onClick={handleSubmit}
+            disabled={!answers[currentQuestion.id] || submitting}
           >
-            Soumettre le quiz
+            {submitting ? 'Envoi en cours...' : 'Soumettre le quiz'}
           </Button>
         )}
       </Box>

@@ -1,0 +1,8 @@
+Créer pour moi 5 questions : 
+elle doive comporter : 
+- Titre
+- Description
+- Type de question (choix multiple ou Vrai/Faux ou Réponse courte)
+- Question
+- Options (cochez la réponse correcte)
+- Explication (feedback)
