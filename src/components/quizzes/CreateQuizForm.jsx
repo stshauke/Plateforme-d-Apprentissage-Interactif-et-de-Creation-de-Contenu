@@ -82,6 +82,7 @@ const CreateQuizForm = ({  courseId,lessonId, onQuizCreated }) => {
         createdAt: new Date().toISOString(),
         questionsCount: quiz.questions.length
       });
+      console.log("Quiz créé avec l'ID :", quizRef.id); // <-- Vérifiez cet ID
 
       // Ajouter les questions
       const questionsRef = collection(db, 'quizzes', quizRef.id, 'questions');

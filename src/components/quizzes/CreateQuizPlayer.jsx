@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Button, 
@@ -27,6 +28,8 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const CreateQuizPlayer = ({ quizId, onClose }) => {
   const { currentUser } = useAuth();
+  console.log('[CreateQuizPlayer] currentUser:', currentUser?.uid); // Debug auth
+  
   const [quiz, setQuiz] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -39,52 +42,70 @@ const CreateQuizPlayer = ({ quizId, onClose }) => {
   useEffect(() => {
     const fetchQuizData = async () => {
       try {
+        console.log('[FetchQuizData] Début du chargement pour quizId:', quizId);
         setLoading(true);
         
-        // Récupérer les infos du quiz
+        // 1. Chargement des métadonnées du quiz
         const quizDoc = await getDoc(doc(db, 'quizzes', quizId));
+        console.log('[FetchQuizData] Résultat getDoc(quiz):', quizDoc.exists());
+        
         if (!quizDoc.exists()) {
           throw new Error('Quiz non trouvé');
         }
-        setQuiz({ id: quizDoc.id, ...quizDoc.data() });
+        
+        const quizData = { id: quizDoc.id, ...quizDoc.data() };
+        setQuiz(quizData);
+        console.log('[FetchQuizData] Quiz chargé:', quizData);
 
-        // Préparer la requête questions
-        let questionsQuery;
-        // Si tu as un champ order dans les questions, garde orderBy, sinon retire-le
-        try {
-          questionsQuery = query(
-            collection(db, 'quizzes', quizId, 'questions'),
-            orderBy('order', 'asc')
-          );
-          await getDocs(questionsQuery); // juste pour vérifier l'existence du champ 'order'
-        } catch {
-          // Si 'order' n'existe pas, on récupère sans orderBy
-          questionsQuery = collection(db, 'quizzes', quizId, 'questions');
-        }
-
-        // Récupérer les questions
+        // 2. Chargement des questions
+        const questionsQuery = collection(db, 'quizzes', quizId, 'questions');
         const questionsSnapshot = await getDocs(questionsQuery);
-        
-        const loadedQuestions = questionsSnapshot.docs.map(d => ({
-          id: d.id,
-          ...d.data()
-        }));
-        
+        console.log('[FetchQuizData] Nombre de questions trouvées:', questionsSnapshot.size);
+
+        const loadedQuestions = questionsSnapshot.docs.map(d => {
+          const qData = d.data();
+          console.log(`[Question ${d.id}]`, qData); // Debug chaque question
+          
+          // Validation des champs requis
+          if (!qData.text || qData.correctAnswer === undefined) {
+            console.warn(`Question ${d.id} invalide - champs manquants`);
+          }
+          
+          return { id: d.id, ...qData };
+        }).filter(q => q.text && q.correctAnswer !== undefined); // Filtre les questions valides
+
+        console.log('[FetchQuizData] Questions validées:', loadedQuestions);
         setQuestions(loadedQuestions);
-        setLoading(false);
+        
       } catch (err) {
-        console.error("Erreur de chargement du quiz:", err);
+        console.error('[FetchQuizData] Erreur:', err);
         setError(err.message);
+      } finally {
+        console.log('[FetchQuizData] Chargement terminé');
         setLoading(false);
       }
     };
 
     if (quizId) {
       fetchQuizData();
+    } else {
+      setError('ID de quiz manquant');
+      setLoading(false);
     }
   }, [quizId]);
 
+  console.log('[Render] État actuel:', {
+    loading,
+    error,
+    quiz,
+    questions,
+    currentQuestionIndex,
+    answers,
+    results
+  });
+
   const handleAnswerChange = (questionId, value) => {
+    console.log('[AnswerChange] Question:', questionId, 'Réponse:', value);
     setAnswers(prev => ({
       ...prev,
       [questionId]: value
@@ -92,15 +113,14 @@ const CreateQuizPlayer = ({ quizId, onClose }) => {
   };
 
   const calculateScore = () => {
+    console.log('[CalculateScore] Calcul des résultats...');
     let score = 0;
     const calculatedResults = {};
 
     questions.forEach(question => {
       const userAnswer = answers[question.id];
-      // Pour éviter erreur type, on convertit en string
       const correctAnswer = question.correctAnswer?.toString() || '';
       const userAnsStr = userAnswer?.toString() || '';
-
       const isCorrect = userAnsStr === correctAnswer;
 
       calculatedResults[question.id] = {
@@ -117,15 +137,18 @@ const CreateQuizPlayer = ({ quizId, onClose }) => {
       }
     });
 
+    console.log('[CalculateScore] Résultats:', { score, calculatedResults });
     return { score, calculatedResults };
   };
 
   const handleSubmit = async () => {
     try {
+      console.log('[Submit] Début de la soumission');
       setSubmitting(true);
       const { score, calculatedResults } = calculateScore();
 
       if (currentUser) {
+        console.log('[Submit] Sauvegarde des résultats pour user:', currentUser.uid);
         await setDoc(doc(db, 'users', currentUser.uid, 'quizResults', quizId), {
           quizId,
           userId: currentUser.uid,
@@ -141,8 +164,9 @@ const CreateQuizPlayer = ({ quizId, onClose }) => {
         totalPoints: questions.reduce((sum, q) => sum + (q.points || 0), 0),
         details: calculatedResults
       });
+      console.log('[Submit] Quiz soumis avec succès');
     } catch (err) {
-      console.error("Erreur lors de la soumission:", err);
+      console.error('[Submit] Erreur:', err);
       setError("Une erreur est survenue lors de l'envoi du quiz");
     } finally {
       setSubmitting(false);
@@ -150,13 +174,15 @@ const CreateQuizPlayer = ({ quizId, onClose }) => {
   };
 
   const navigateQuestion = (direction) => {
-    setCurrentQuestionIndex(prev => {
-      const newIndex = direction === 'next' ? prev + 1 : prev - 1;
-      return Math.max(0, Math.min(newIndex, questions.length - 1));
-    });
+    const newIndex = direction === 'next' ? currentQuestionIndex + 1 : currentQuestionIndex - 1;
+    const clampedIndex = Math.max(0, Math.min(newIndex, questions.length - 1));
+    console.log('[Navigate] Direction:', direction, 'Nouvel index:', clampedIndex);
+    setCurrentQuestionIndex(clampedIndex);
   };
 
+  // Gestion des états de rendu
   if (loading) {
+    console.log('[Render] État: Chargement');
     return (
       <Box sx={{ p: 4, textAlign: 'center' }}>
         <CircularProgress />
@@ -166,6 +192,7 @@ const CreateQuizPlayer = ({ quizId, onClose }) => {
   }
 
   if (error) {
+    console.log('[Render] État: Erreur', error);
     return (
       <Alert severity="error" sx={{ m: 2 }}>
         {error}
@@ -177,6 +204,7 @@ const CreateQuizPlayer = ({ quizId, onClose }) => {
   }
 
   if (!quiz) {
+    console.log('[Render] État: Quiz non disponible');
     return (
       <Alert severity="warning" sx={{ m: 2 }}>
         Quiz non disponible
@@ -185,6 +213,7 @@ const CreateQuizPlayer = ({ quizId, onClose }) => {
   }
 
   if (results) {
+    console.log('[Render] État: Affichage des résultats');
     return (
       <Box sx={{ p: 3 }}>
         <Typography variant="h5" gutterBottom>
@@ -253,6 +282,7 @@ const CreateQuizPlayer = ({ quizId, onClose }) => {
   }
 
   if (questions.length === 0) {
+     console.log('[Render] État: Aucune question');
     return (
       <Alert severity="info" sx={{ m: 2 }}>
         Ce quiz ne contient aucune question.
@@ -262,7 +292,7 @@ const CreateQuizPlayer = ({ quizId, onClose }) => {
       </Alert>
     );
   }
-
+  console.log('[Render] État: Affichage du quiz');
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
 
