@@ -4,15 +4,19 @@ import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 
 const Navbar = ({ isAuthenticated, onLoginClick, onLogoutClick }) => {
+  const [userRole, setUserRole] = useState('');
   const [roleLabel, setRoleLabel] = useState('');
 
   useEffect(() => {
     if (isAuthenticated) {
       const role = localStorage.getItem('userRole');
+      setUserRole(role);
       switch (role) {
         case 'admin':
           setRoleLabel('Espace Admin');
@@ -27,6 +31,7 @@ const Navbar = ({ isAuthenticated, onLoginClick, onLogoutClick }) => {
           setRoleLabel('');
       }
     } else {
+      setUserRole('');
       setRoleLabel('');
     }
   }, [isAuthenticated]);
@@ -64,9 +69,24 @@ const Navbar = ({ isAuthenticated, onLoginClick, onLogoutClick }) => {
             Cours
           </Button>
 
-          <Button color="inherit" component={Link} to="/create-course" sx={{ mx: 1 }}>
-            Créer un cours
-          </Button>
+          {/* Afficher le bouton tableau de bord uniquement pour les créateurs */}
+          {userRole === 'creator' && (
+            <IconButton
+              color="inherit"
+              component={Link}
+              to="/creator/dashboard"
+              sx={{ mx: 1 }}
+              aria-label="Tableau de bord créateur"
+            >
+              <DashboardIcon />
+            </IconButton>
+          )}
+
+          {userRole === 'creator' && (
+            <Button color="inherit" component={Link} to="/create-course" sx={{ mx: 1 }}>
+              Créer un cours
+            </Button>
+          )}
 
           {isAuthenticated ? (
             <Button color="inherit" onClick={onLogoutClick} sx={{ ml: 2 }}>

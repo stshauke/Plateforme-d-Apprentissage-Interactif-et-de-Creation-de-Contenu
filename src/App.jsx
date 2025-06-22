@@ -19,6 +19,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './utils/firebase';
 
 import { Box, CssBaseline } from '@mui/material';
+import DashboardCreator from './pages/creator/DashboardCreator';
 
 const App = () => {
   const [activeModal, setActiveModal] = useState(null);
@@ -74,6 +75,14 @@ const App = () => {
                   </ProtectedRoute>
                 }
               />
+                <Route
+  path="/creator/dashboard"
+  element={
+    <ProtectedRoute allowedRoles={['creator']}>
+      <DashboardCreator />
+    </ProtectedRoute>
+  }
+/>
             </Routes>
           </Box>
 
