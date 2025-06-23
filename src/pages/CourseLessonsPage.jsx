@@ -275,6 +275,27 @@ console.log('isInstructor:', isInstructor, 'currentUser:', currentUser?.uid, 'co
         </Typography>
       </Box>
 
+      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+  <Button
+    variant="outlined"
+    component={Link}
+    to={`/courses/${courseId}`}
+  >
+    Voir le cours
+  </Button>
+  
+  {isInstructor && (
+    <Button
+      variant="outlined"
+      component={Link}
+      to={`/courses/${courseId}/edit`}
+      color="secondary"
+    >
+      Modifier le cours
+    </Button>
+  )}
+</Box>
+
       <CourseProgress
         courseId={courseId}
         lessons={state.lessons}

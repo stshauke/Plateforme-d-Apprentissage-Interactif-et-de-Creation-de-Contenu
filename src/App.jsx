@@ -20,6 +20,7 @@ import { auth } from './utils/firebase';
 
 import { Box, CssBaseline } from '@mui/material';
 import DashboardCreator from './pages/creator/DashboardCreator';
+import EditCoursePage from './pages/EditCoursePage';
 
 const App = () => {
   const [activeModal, setActiveModal] = useState(null);
@@ -59,10 +60,11 @@ const App = () => {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/courses" element={<CoursesPage />} />
-              <Route path="/courses/:courseId" element={<CoursePage />} />
+              
               <Route path="/courses/:courseId/lessons" element={<CourseLessonsPage />} />
+              <Route path="/courses/:courseId" element={<CoursePage />} />
               <Route path="/courses/:courseId/lessons/:lessonId" element={<LessonDetailPage />} />
-
+              <Route path="/courses/:courseId/edit" element={<EditCoursePage />} />
               {/* ✅ Route d'édition de quiz */}
               <Route path="/quiz/edit/:quizId" element={<EditQuizPage />} />
 
