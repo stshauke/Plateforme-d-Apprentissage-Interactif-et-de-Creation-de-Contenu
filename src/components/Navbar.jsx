@@ -9,15 +9,13 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 
-const Navbar = ({ isAuthenticated, onLoginClick, onLogoutClick }) => {
-  const [userRole, setUserRole] = useState('');
+const Navbar = ({ isAuthenticated,userRole, onLoginClick, onLogoutClick }) => {
   const [roleLabel, setRoleLabel] = useState('');
 
   useEffect(() => {
-    if (isAuthenticated) {
-      const role = localStorage.getItem('userRole');
-      setUserRole(role);
-      switch (role) {
+    console.log('userRole:', userRole);
+    if (isAuthenticated && userRole) {
+      switch (userRole) {
         case 'admin':
           setRoleLabel('Espace Admin');
           break;
@@ -31,10 +29,9 @@ const Navbar = ({ isAuthenticated, onLoginClick, onLogoutClick }) => {
           setRoleLabel('');
       }
     } else {
-      setUserRole('');
       setRoleLabel('');
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, userRole]);
 
   return (
     <AppBar position="static" color="primary">
@@ -81,7 +78,6 @@ const Navbar = ({ isAuthenticated, onLoginClick, onLogoutClick }) => {
               <DashboardIcon />
             </IconButton>
           )}
-
           {userRole === 'creator' && (
             <Button color="inherit" component={Link} to="/create-course" sx={{ mx: 1 }}>
               Créer un cours

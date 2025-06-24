@@ -14,10 +14,12 @@ import LoginModal from './components/LoginModal';
 import RegisterModal from './components/RegisterModal';
 import ProtectedRoute from './components/ProtectedRoute';
 
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from './utils/firebase';
-
+import { auth, db } from './utils/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { Box, CssBaseline } from '@mui/material';
 import DashboardCreator from './pages/creator/DashboardCreator';
 import EditCoursePage from './pages/EditCoursePage';
@@ -25,18 +27,32 @@ import EditCoursePage from './pages/EditCoursePage';
 const App = () => {
   const [activeModal, setActiveModal] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setIsAuthenticated(!!user);
-    });
-    return () => unsubscribe();
-  }, []);
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const role = userDoc.exists() ? userDoc.data().role : null;
+      setIsAuthenticated(true);
+      setUserRole(role);
+      localStorage.setItem('userRole', role);
+    } else {
+      setIsAuthenticated(false);
+      setUserRole(null);
+      localStorage.removeItem('userRole');
+    }
+  });
+  return () => unsubscribe();
+}, []);
+
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
       setIsAuthenticated(false);
+      toast.success('Déconnexion réussie !');
+      setUserRole('');
       localStorage.removeItem('userRole');
     } catch (error) {
       console.error("Erreur lors de la déconnexion :", error.message);
@@ -51,6 +67,7 @@ const App = () => {
           {/* Header */}
           <Navbar
             isAuthenticated={isAuthenticated}
+            userRole={userRole}
             onLoginClick={() => setActiveModal('login')}
             onLogoutClick={handleLogout}
           />
@@ -90,6 +107,7 @@ const App = () => {
 
           {/* Footer */}
           <Footer />
+          <ToastContainer position="top-right" autoClose={3000} hideProgressBar />
 
           {/* Modals */}
           <LoginModal
