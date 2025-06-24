@@ -6,20 +6,19 @@ import CoursesPage from './pages/CoursesPage';
 import CourseLessonsPage from './pages/CourseLessonsPage';
 import CreateCoursePage from './pages/CreateCoursePage';
 import LessonDetailPage from './pages/LessonDetailPage';
-import EditQuizPage from './pages/EditQuizPage'; // ✅ à créer si ce n’est pas fait
-
+import EditQuizPage from './pages/EditQuizPage';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import LoginModal from './components/LoginModal';
 import RegisterModal from './components/RegisterModal';
 import ProtectedRoute from './components/ProtectedRoute';
-
 import { AuthProvider } from './contexts/AuthContext';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './utils/firebase';
-
 import { Box, CssBaseline } from '@mui/material';
 import DashboardCreator from './pages/creator/DashboardCreator';
+import DashboardAdmin from './pages/admin/DashboardAdmin';
+import DashboardStudent from './pages/student/DashboardStudent';
 import EditCoursePage from './pages/EditCoursePage';
 
 const App = () => {
@@ -60,15 +59,13 @@ const App = () => {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/courses" element={<CoursesPage />} />
-              
               <Route path="/courses/:courseId/lessons" element={<CourseLessonsPage />} />
               <Route path="/courses/:courseId" element={<CoursePage />} />
               <Route path="/courses/:courseId/lessons/:lessonId" element={<LessonDetailPage />} />
               <Route path="/courses/:courseId/edit" element={<EditCoursePage />} />
-              {/* ✅ Route d'édition de quiz */}
               <Route path="/quiz/edit/:quizId" element={<EditQuizPage />} />
 
-              {/* Route protégée */}
+              {/* Routes protégées */}
               <Route
                 path="/create-course"
                 element={
@@ -77,15 +74,36 @@ const App = () => {
                   </ProtectedRoute>
                 }
               />
-                <Route
-  path="/creator/dashboard"
+              
+              {/* Dashboard Créateur */}
+              <Route
+                path="/creator/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={['creator']}>
+                    <DashboardCreator />
+                  </ProtectedRoute>
+                }
+              />
+              
+              {/* Dashboard Admin */}
+              <Route
+                path="/admin/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <DashboardAdmin />
+                  </ProtectedRoute>
+                }
+              />
+           
+            <Route
+  path="/student/dashboard"
   element={
-    <ProtectedRoute allowedRoles={['creator']}>
-      <DashboardCreator />
+    <ProtectedRoute allowedRoles={['student']}>
+      <DashboardStudent />
     </ProtectedRoute>
   }
 />
-            </Routes>
+ </Routes>
           </Box>
 
           {/* Footer */}
