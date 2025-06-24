@@ -75,7 +75,7 @@ const App = () => {
           {/* Main Content */}
           <Box component="main" sx={{ flex: 1, px: 2, py: 3 }}>
             <Routes>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<Home onLoginRequest={() => setActiveModal('login')} />} />
               <Route path="/courses" element={<CoursesPage />} />
               
               <Route path="/courses/:courseId/lessons" element={<CourseLessonsPage />} />

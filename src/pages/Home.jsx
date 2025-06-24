@@ -2,9 +2,20 @@ import React from 'react';
 import { Box, Typography, Button, Grid, Card, CardContent } from '@mui/material';
 import backgroundImage from '../assets/images/img_home.jpg';
 import ThematiqueSection from '../components/ThematiqueSection';
+import { useNavigate } from 'react-router-dom';
+import { auth } from '../utils/firebase';
 
 
-const Home = () => {
+const Home = ({onLoginRequest}) => {
+  const navigate = useNavigate();
+
+  const handleStartClick = () => {
+    if (auth.currentUser) {
+      navigate('/courses');
+    } else {
+      onLoginRequest(); // Ouvre la modal de login
+    }
+  };
   return (
     <Box sx={{ width: '100%', overflowX: 'hidden' }}>
       {/* Hero Section */}
@@ -31,7 +42,7 @@ const Home = () => {
           <Typography variant="h6" sx={{ mb: 4 }}>
             Une plateforme interactive pour créer, apprendre et progresser.
           </Typography>
-          <Button variant="contained" color="secondary" size="large">
+          <Button variant="contained" color="secondary" size="large" onClick={handleStartClick}>
             Commencer maintenant
           </Button>
         </Box>
