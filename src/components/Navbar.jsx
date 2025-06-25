@@ -6,6 +6,8 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import SchoolIcon from '@mui/icons-material/School'; // Icône pour l'étudiant
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 
@@ -66,7 +68,20 @@ const Navbar = ({ isAuthenticated,userRole, onLoginClick, onLogoutClick }) => {
             Cours
           </Button>
 
-          {/* Afficher le bouton tableau de bord uniquement pour les créateurs */}
+          {/* Afficher le bouton tableau de bord pour les étudiants */}
+          {userRole === 'student' && (
+            <IconButton
+              color="inherit"
+              component={Link}
+              to="/student/dashboard"
+              sx={{ mx: 1 }}
+              aria-label="Tableau de bord étudiant"
+            >
+              <SchoolIcon />
+            </IconButton>
+          )}
+
+          {/* Afficher le bouton tableau de bord pour les créateurs */}
           {userRole === 'creator' && (
             <IconButton
               color="inherit"

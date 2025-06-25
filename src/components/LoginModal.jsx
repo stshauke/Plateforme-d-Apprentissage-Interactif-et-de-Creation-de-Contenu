@@ -1,18 +1,16 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../utils/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-
 import ReCAPTCHA from 'react-google-recaptcha';
-
 import {
   Dialog, DialogTitle, DialogContent,
   Typography, Button, TextField,
   Divider, Link, IconButton, Box, Grid, Card, CardActionArea,
   CircularProgress, Alert
 } from '@mui/material';
-
 import CloseIcon from '@mui/icons-material/Close';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
@@ -20,13 +18,13 @@ import GoogleIcon from '@mui/icons-material/Google';
 import { validateForm } from '../utils/validation';
 
 const LoginModal = ({ open, onClose, onSwitchToRegister }) => {
+  const navigate = useNavigate();
   const recaptchaRef = useRef(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [formErrors, setFormErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   useEffect(() => {
     if (!open) resetForm();
@@ -37,7 +35,6 @@ const LoginModal = ({ open, onClose, onSwitchToRegister }) => {
     setPassword('');
     setFormErrors({});
     setSubmitError('');
-    setSubmitSuccess(false);
     recaptchaRef.current?.reset();
   };
 
@@ -58,29 +55,35 @@ const LoginModal = ({ open, onClose, onSwitchToRegister }) => {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 🔍 Récupérer les infos utilisateur depuis Firestore
       const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
 
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        console.log('Connecté :', user.email);
-        console.log('Rôle :', userData.role);
-
-        // Facultatif : stocker le rôle localement
         localStorage.setItem('userRole', userData.role);
+
+        // Redirection selon le rôle
+        switch(userData.role) {
+          case 'admin':
+            navigate('/admin/dashboard');
+            break;
+          case 'creator':
+            navigate('/creator/dashboard');
+            break;
+          case 'student':
+            navigate('/student/dashboard');
+            break;
+          default:
+            navigate('/');
+        }
       } else {
         console.warn("Données utilisateur non trouvées dans Firestore.");
+        navigate('/');
       }
-
-      setSubmitSuccess(true);
-      setTimeout(() => {
-        onClose();
-        resetForm();
-      }, 2000);
+      onClose();
     } catch (error) {
-      console.error('Erreur Firebase :', error.message);
-      setSubmitError("Échec de l'authentification : " + error.message);
+      console.error('Erreur Firebase:', error);
+      setSubmitError("Échec de l'authentification: " + error.message);
     } finally {
       setIsLoading(false);
     }
@@ -190,21 +193,15 @@ const LoginModal = ({ open, onClose, onSwitchToRegister }) => {
             </Alert>
           )}
 
-          {submitSuccess ? (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              Connexion réussie ! Redirection en cours...
-            </Alert>
-          ) : (
-            <Button
-              type="submit"
-              variant="contained"
-              fullWidth
-              disabled={isLoading}
-              endIcon={isLoading ? <CircularProgress size={20} /> : null}
-            >
-              {isLoading ? 'Traitement...' : 'SUIVANT'}
-            </Button>
-          )}
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            disabled={isLoading}
+            endIcon={isLoading ? <CircularProgress size={20} /> : null}
+          >
+            {isLoading ? 'Traitement...' : 'SE CONNECTER'}
+          </Button>
         </Box>
 
         <Box sx={{ mt: 3, textAlign: 'center' }}>
